@@ -3,7 +3,7 @@ $ErrorActionPreference = 'SilentlyContinue'
 $script:AppName = 'SYS CTRL v2.0'
 $script:AppVersion = [version]'2.0.0'
 $script:Author = 'Made By SuCH CHAoS'
-$script:GitHubRepository = $env:SYSCTRL_GITHUB_REPOSITORY
+$script:GitHubRepository = 'SuCH-CHAoS/SYS-CTRL'
 $script:UpdateStatus = $null
 $script:DataDirectory = Join-Path $env:LOCALAPPDATA 'SYS CTRL v2.0'
 $script:ActivityPath = Join-Path $script:DataDirectory 'activity.jsonl'
@@ -32,18 +32,7 @@ function Get-SystemDrive {
 }
 
 function Get-GitHubRepository {
-    if (-not [string]::IsNullOrWhiteSpace($script:GitHubRepository)) {
-        return $script:GitHubRepository.Trim()
-    }
-
-    try {
-        $remote = & git.exe -C $PSScriptRoot config --get remote.origin.url 2>$null
-        if ($remote -match 'github\.com[/:](?<repository>[^/\s]+/[^/\s]+?)(?:\.git)?$') {
-            return $Matches.repository
-        }
-    } catch { }
-
-    return $null
+    return $script:GitHubRepository
 }
 
 function Get-GitHubUpdateStatus {

@@ -35,9 +35,7 @@ The batch file starts the PowerShell interface with UTF-8 support, allowing the 
 
 ## Updates
 
-SYS CTRL checks the latest GitHub Release during its boot sequence. Releases should use version tags in the form `v2.0.0`. When a newer release is found, the header displays the available version. The check does not download or install updates automatically.
-
-When the repository is published, SYS CTRL discovers its GitHub repository from the `origin` remote. A packaged copy can be directed to a repository by setting the `SYSCTRL_GITHUB_REPOSITORY` environment variable to `owner/repository`.
+SYS CTRL checks the latest [SYS CTRL GitHub Release](https://github.com/SuCH-CHAoS/SYS-CTRL/releases) during its boot sequence. Releases use version tags in the form `v2.0.0`. When a newer release is found, the header displays the available version. The check does not download or install updates automatically.
 
 ## Release process
 
