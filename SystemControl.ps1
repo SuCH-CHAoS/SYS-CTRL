@@ -61,7 +61,7 @@ function Get-GitHubUpdateStatus {
                 [pscustomobject]@{
                     Version = [version]$versionText
                     Tag = $tag
-                    Url = ('https://github.com/{0}/releases/tag/{1}' -f $repository, $tag)
+                    Url = ('https://github.com/{0}/tree/{1}' -f $repository, $tag)
                 }
             } catch { }
         }
