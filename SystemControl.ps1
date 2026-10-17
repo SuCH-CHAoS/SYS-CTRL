@@ -52,17 +52,33 @@ function Get-GitHubUpdateStatus {
             'Accept' = 'application/vnd.github+json'
             'User-Agent' = ('SYS-CTRL/{0}' -f $script:AppVersion)
         }
-        $release = Invoke-RestMethod -Uri ('https://api.github.com/repos/{0}/releases/latest' -f $repository) -Headers $headers -TimeoutSec 4 -ErrorAction Stop
-        $tag = [string]$release.tag_name
-        $versionText = ($tag -replace '^[vV]', '') -replace '[^0-9.].*$', ''
-        $latestVersion = [version]$versionText
+        $tags = Invoke-RestMethod -Uri ('https://api.github.com/repos/{0}/tags?per_page=100' -f $repository) -Headers $headers -TimeoutSec 4 -ErrorAction Stop
+        $availableVersions = foreach ($tagRecord in @($tags)) {
+            $tag = [string]$tagRecord.name
+            $versionText = ($tag -replace '^[vV]', '') -replace '[^0-9.].*$', ''
+
+            try {
+                [pscustomobject]@{
+                    Version = [version]$versionText
+                    Tag = $tag
+                    Url = ('https://github.com/{0}/releases/tag/{1}' -f $repository, $tag)
+                }
+            } catch { }
+        }
+
+        $latest = $availableVersions | Sort-Object -Property Version -Descending | Select-Object -First 1
+        if ($null -eq $latest) {
+            throw 'No version tags are available.'
+        }
+
+        $latestVersion = $latest.Version
 
         if ($latestVersion -gt $script:AppVersion) {
             return [pscustomobject]@{
                 State = 'UpdateAvailable'
                 Text = ('UPDATE AVAILABLE: v{0}' -f $latestVersion)
                 Color = [ConsoleColor]::Yellow
-                Url = [string]$release.html_url
+                Url = $latest.Url
             }
         }
 
@@ -70,7 +86,7 @@ function Get-GitHubUpdateStatus {
             State = 'Current'
             Text = ('UPDATE CHECK: v{0} IS CURRENT' -f $script:AppVersion)
             Color = [ConsoleColor]::DarkCyan
-            Url = [string]$release.html_url
+            Url = $latest.Url
         }
     } catch {
         return [pscustomobject]@{

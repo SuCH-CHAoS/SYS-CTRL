@@ -35,14 +35,14 @@ The batch file starts the PowerShell interface with UTF-8 support, allowing the 
 
 ## Updates
 
-SYS CTRL checks the latest [SYS CTRL GitHub Release](https://github.com/SuCH-CHAoS/SYS-CTRL/releases) during its boot sequence. Releases use version tags in the form `v2.0.0`. When a newer release is found, the header displays the available version. The check does not download or install updates automatically.
+SYS CTRL checks the latest [SYS CTRL version tag](https://github.com/SuCH-CHAoS/SYS-CTRL/tags) during its boot sequence. Versions use tags in the form `v2.0.0`. When a newer version is found, the header displays the available version. The check does not download or install updates automatically.
 
 ## Release process
 
 1. Update the application version in `SystemControl.ps1`.
 2. Commit the release changes.
-3. Create a GitHub Release with a matching tag, such as `v2.0.0`.
-4. Attach a ZIP archive containing both launch files if you publish downloadable builds.
+3. Create and push a matching Git tag, such as `v2.0.0`.
+4. Optionally create a GitHub Release from that tag and attach a ZIP archive containing both launch files.
 
 ## Safety notes
 
