@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
 $script:AppName = 'SYS CTRL v2.0'
-$script:AppVersion = [version]'2.0.0'
+$script:AppVersion = [version]'2.0.1'
 $script:Author = 'Made By SuCH CHAoS'
 $script:GitHubRepository = 'SuCH-CHAoS/SYS-CTRL'
 $script:UpdateStatus = $null
@@ -31,18 +31,13 @@ function Get-SystemDrive {
     return Get-PSDrive -Name $driveName -ErrorAction SilentlyContinue
 }
 
-function Get-GitHubRepository {
-    return $script:GitHubRepository
-}
-
 function Get-GitHubUpdateStatus {
-    $repository = Get-GitHubRepository
+    $repository = $script:GitHubRepository
     if ([string]::IsNullOrWhiteSpace($repository)) {
         return [pscustomobject]@{
             State = 'NotConfigured'
             Text = 'UPDATE CHECK: REPOSITORY NOT CONFIGURED'
             Color = [ConsoleColor]::DarkGray
-            Url = $null
         }
     }
 
@@ -55,13 +50,11 @@ function Get-GitHubUpdateStatus {
         $tags = Invoke-RestMethod -Uri ('https://api.github.com/repos/{0}/tags?per_page=100' -f $repository) -Headers $headers -TimeoutSec 4 -ErrorAction Stop
         $availableVersions = foreach ($tagRecord in @($tags)) {
             $tag = [string]$tagRecord.name
-            $versionText = ($tag -replace '^[vV]', '') -replace '[^0-9.].*$', ''
+            if ($tag -notmatch '^[vV]?(?<Version>\d+(?:\.\d+){1,3})$') { continue }
 
             try {
                 [pscustomobject]@{
-                    Version = [version]$versionText
-                    Tag = $tag
-                    Url = ('https://github.com/{0}/tree/{1}' -f $repository, $tag)
+                    Version = [version]$Matches.Version
                 }
             } catch { }
         }
@@ -78,7 +71,6 @@ function Get-GitHubUpdateStatus {
                 State = 'UpdateAvailable'
                 Text = ('UPDATE AVAILABLE: v{0}' -f $latestVersion)
                 Color = [ConsoleColor]::Yellow
-                Url = $latest.Url
             }
         }
 
@@ -86,14 +78,12 @@ function Get-GitHubUpdateStatus {
             State = 'Current'
             Text = ('UPDATE CHECK: v{0} IS CURRENT' -f $script:AppVersion)
             Color = [ConsoleColor]::DarkCyan
-            Url = $latest.Url
         }
     } catch {
         return [pscustomobject]@{
             State = 'Unavailable'
             Text = 'UPDATE CHECK: GITHUB UNAVAILABLE'
             Color = [ConsoleColor]::DarkGray
-            Url = $null
         }
     }
 }
@@ -297,9 +287,9 @@ function Show-BootSequence {
     Write-RetroBorder -Position Bottom
     Write-Host ''
 
-    $steps = @('Safe cleanup map', 'Recovery tools', 'GitHub release check', 'Terminal display', 'Control deck')
+    $steps = @('Safe cleanup map', 'Recovery tools', 'GitHub version check', 'Terminal display', 'Control deck')
     foreach ($step in $steps) {
-        if ($step -eq 'GitHub release check') {
+        if ($step -eq 'GitHub version check') {
             Initialize-GitHubUpdateStatus
         }
         $layout = Get-RetroLayout

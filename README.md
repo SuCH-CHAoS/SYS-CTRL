@@ -2,7 +2,7 @@
 
 SYS CTRL is a Windows terminal control deck for routine system maintenance. It combines safe temporary-file cleanup, storage inspection, repair tools, application updates, and power controls in a single retro-styled console interface.
 
-Version: 2.0.0
+Version: 2.0.1
 
 ## Requirements
 
