@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
 $script:AppName = 'SYS CTRL v2.0'
-$script:AppVersion = [version]'2.0.1'
+$script:AppVersion = [version]'2.0.2'
 $script:Author = 'Made By SuCH CHAoS'
 $script:GitHubRepository = 'SuCH-CHAoS/SYS-CTRL'
 $script:UpdateStatus = $null
@@ -19,11 +19,14 @@ function Initialize-SysCtrlStorage {
 function Format-Bytes {
     param([long]$Bytes)
 
-    if ($Bytes -ge 1TB) { return ('{0:N2} TB' -f ($Bytes / 1TB)) }
-    if ($Bytes -ge 1GB) { return ('{0:N2} GB' -f ($Bytes / 1GB)) }
-    if ($Bytes -ge 1MB) { return ('{0:N2} MB' -f ($Bytes / 1MB)) }
-    if ($Bytes -ge 1KB) { return ('{0:N1} KB' -f ($Bytes / 1KB)) }
-    return ('{0} B' -f $Bytes)
+    $prefix = if ($Bytes -lt 0) { '-' } else { '' }
+    [double]$absoluteBytes = [math]::Abs([double]$Bytes)
+
+    if ($absoluteBytes -ge 1TB) { return ('{0}{1:N2} TB' -f $prefix, ($absoluteBytes / 1TB)) }
+    if ($absoluteBytes -ge 1GB) { return ('{0}{1:N2} GB' -f $prefix, ($absoluteBytes / 1GB)) }
+    if ($absoluteBytes -ge 1MB) { return ('{0}{1:N2} MB' -f $prefix, ($absoluteBytes / 1MB)) }
+    if ($absoluteBytes -ge 1KB) { return ('{0}{1:N1} KB' -f $prefix, ($absoluteBytes / 1KB)) }
+    return ('{0}{1} B' -f $prefix, $absoluteBytes)
 }
 
 function Get-SystemDrive {
@@ -71,6 +74,14 @@ function Get-GitHubUpdateStatus {
                 State = 'UpdateAvailable'
                 Text = ('UPDATE AVAILABLE: v{0}' -f $latestVersion)
                 Color = [ConsoleColor]::Yellow
+            }
+        }
+
+        if ($latestVersion -lt $script:AppVersion) {
+            return [pscustomobject]@{
+                State = 'LocalAhead'
+                Text = ('LOCAL BUILD: v{0} // GITHUB: v{1}' -f $script:AppVersion, $latestVersion)
+                Color = [ConsoleColor]::DarkYellow
             }
         }
 
@@ -297,12 +308,18 @@ function Show-BootSequence {
         $meterWidth = [math]::Min(26, [math]::Max(14, $layout.InnerWidth - $labelWidth - 16))
         $prefixFormat = '> {0,-' + $labelWidth + '} ['
         $prefix = (' ' * $layout.Indent) + ($prefixFormat -f $step)
-        for ($frame = 0; $frame -le 12; $frame++) {
-            $filled = [math]::Round(($frame / 12) * $meterWidth)
-            $bar = ('=' * $filled).PadRight($meterWidth, '.')
-            $line = $prefix + $bar + ']  READY'
+        $states = @('LINK', 'SCAN', 'SYNC')
+        for ($frame = 0; $frame -le 8; $frame++) {
+            $filled = [math]::Round(($frame / 8) * $meterWidth)
+            $bar = if ($filled -ge $meterWidth) {
+                '=' * $meterWidth
+            } else {
+                (('=' * $filled) + '>').PadRight($meterWidth, '.')
+            }
+            $state = if ($frame -eq 8) { 'READY' } else { $states[$frame % $states.Count] }
+            $line = $prefix + $bar + ']  ' + $state
             Write-Host ([char]13 + $line) -NoNewline -ForegroundColor Cyan
-            Start-Sleep -Milliseconds 24
+            Start-Sleep -Milliseconds 58
         }
         Write-Host ''
         Write-Host ''
@@ -315,6 +332,29 @@ function Pause-SysCtrl {
     Write-Host ''
     [void](Read-Host ((' ' * $layout.Indent) + 'PRESS ENTER TO RETURN TO SYS CTRL'))
     Show-PageTransition -Text 'RETURNING TO MAIN MENU'
+}
+
+function Write-MainMenuPrompt {
+    param(
+        [string]$Selection = '',
+        [int]$Frame = 0
+    )
+
+    $layout = Get-RetroLayout
+    try {
+        $consoleWidth = [int]$Host.UI.RawUI.WindowSize.Width
+    } catch {
+        $consoleWidth = 84
+    }
+    $spinner = @('|', '/', '-', '\')[$Frame % 4]
+    $clear = ' ' * [math]::Max(1, $consoleWidth - 1)
+
+    Write-Host ([char]13 + $clear) -NoNewline
+    Write-Host ([char]13 + (' ' * $layout.Indent) + 'SELECT MODULE  > ') -NoNewline -ForegroundColor Yellow
+    if ($Selection) {
+        Write-Host $Selection -NoNewline -ForegroundColor Cyan
+    }
+    Write-Host ('  [ CORE {0} ]' -f $spinner) -NoNewline -ForegroundColor DarkCyan
 }
 
 function Get-ConsoleSizeKey {
@@ -363,12 +403,8 @@ function Show-MainMenu {
     Write-RetroFrameLine '' -Color DarkCyan
     Write-RetroBorder -Position Bottom
 
-    $layout = Get-RetroLayout
     Write-Host ''
-    Write-Host ((' ' * $layout.Indent) + 'SELECT MODULE  > ') -NoNewline -ForegroundColor Yellow
-    if ($Selection) {
-        Write-Host $Selection -NoNewline -ForegroundColor Cyan
-    }
+    Write-MainMenuPrompt -Selection $Selection
 }
 
 function Show-ModulePanel {
@@ -394,21 +430,32 @@ function Show-PageTransition {
     param([string]$Text)
 
     $layout = Get-RetroLayout
+    $trackWidth = [math]::Min(34, [math]::Max(18, $layout.InnerWidth - 48))
     $prefix = (' ' * $layout.Indent) + '  ' + $Text.PadRight(30) + ' ['
+    $states = @('TRACE', 'LINK', 'SYNC')
 
     Write-Host ''
-    for ($frame = 0; $frame -lt 6; $frame++) {
-        $dots = ('.' * ($frame + 1)).PadRight(6, ' ')
-        Write-Host ([char]13 + $prefix + $dots + ']') -NoNewline -ForegroundColor DarkCyan
-        Start-Sleep -Milliseconds 125
+    for ($frame = 0; $frame -le 8; $frame++) {
+        $filled = [math]::Round(($frame / 8) * $trackWidth)
+        $bar = if ($filled -ge $trackWidth) {
+            '=' * $trackWidth
+        } else {
+            (('=' * $filled) + '>').PadRight($trackWidth, '.')
+        }
+        $state = if ($frame -eq 8) { 'READY' } else { $states[$frame % $states.Count] }
+        $line = $prefix + $bar + ']  ' + $state
+        Write-Host ([char]13 + $line) -NoNewline -ForegroundColor DarkCyan
+        Start-Sleep -Milliseconds 58
     }
     Write-Host ''
-    Start-Sleep -Milliseconds 180
+    Start-Sleep -Milliseconds 100
 }
 
 function Read-MainMenuChoice {
     $lastSize = Get-ConsoleSizeKey
     $selection = ''
+    $pulseFrame = 0
+    $nextPulse = [DateTime]::UtcNow
 
     while ($true) {
         $currentSize = Get-ConsoleSizeKey
@@ -429,18 +476,14 @@ function Read-MainMenuChoice {
             $character = [string]$key.KeyChar
 
             if ($character -match '^[0-8]$') {
-                if ($selection) {
-                    Write-Host (([string][char]8) + $character) -NoNewline -ForegroundColor Cyan
-                } else {
-                    Write-Host $character -NoNewline -ForegroundColor Cyan
-                }
                 $selection = $character
+                Write-MainMenuPrompt -Selection $selection -Frame $pulseFrame
                 continue
             }
 
             if ($key.Key -eq 'Backspace' -and $selection) {
                 $selection = ''
-                Write-Host (([string][char]8) + ' ' + ([string][char]8)) -NoNewline -ForegroundColor Cyan
+                Write-MainMenuPrompt -Selection $selection -Frame $pulseFrame
                 continue
             }
 
@@ -450,7 +493,13 @@ function Read-MainMenuChoice {
             }
         }
 
-        Start-Sleep -Milliseconds 45
+        if ([DateTime]::UtcNow -ge $nextPulse) {
+            $pulseFrame++
+            Write-MainMenuPrompt -Selection $selection -Frame $pulseFrame
+            $nextPulse = [DateTime]::UtcNow.AddMilliseconds(180)
+        }
+
+        Start-Sleep -Milliseconds 35
     }
 }
 
@@ -508,6 +557,8 @@ function Get-SafeCleanupTargets {
     $explorerCache = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Explorer'
     $internetCache = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\INetCache'
     $legacyWindowsTmp = Join-Path $env:windir 'Tmp'
+    $windowsUpdateDownloads = Join-Path $env:windir 'SoftwareDistribution\Download'
+    $deliveryOptimizationCache = Join-Path $env:ProgramData 'Microsoft\Windows\DeliveryOptimization\Cache'
     $chromeData = Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data'
     $edgeData = Join-Path $env:LOCALAPPDATA 'Microsoft\Edge\User Data'
     $firefoxProfiles = Join-Path $env:LOCALAPPDATA 'Mozilla\Firefox\Profiles'
@@ -537,6 +588,8 @@ function Get-SafeCleanupTargets {
         (New-CleanupTarget -Name 'User temporary files' -Paths @($env:TEMP, $env:TMP, $localTemp)),
         (New-CleanupTarget -Name 'Windows temporary files' -Paths @(Join-Path $env:windir 'Temp')),
         (New-CleanupTarget -Name 'Windows legacy TMP files' -Paths @($legacyWindowsTmp)),
+        (New-CleanupTarget -Name 'Windows Update download cache' -Paths @($windowsUpdateDownloads)),
+        (New-CleanupTarget -Name 'Delivery Optimization cache' -Paths @($deliveryOptimizationCache)),
         (New-CleanupTarget -Name 'Windows error-report cache' -Paths @(
             (Join-Path $werLocal 'ReportArchive'), (Join-Path $werLocal 'ReportQueue'), (Join-Path $werLocal 'Temp'),
             (Join-Path $werMachine 'ReportArchive'), (Join-Path $werMachine 'ReportQueue'), (Join-Path $werMachine 'Temp')
@@ -555,24 +608,88 @@ function Get-CleanupFiles {
     param($Target)
 
     $files = New-Object 'System.Collections.Generic.List[object]'
+    $scanFailures = 0
     if (-not (Test-AppsClosed -ProcessNames $Target.CloseApps)) {
         return [pscustomobject]@{ Files = @(); Skipped = 'Close the related app first' }
     }
 
     foreach ($path in $Target.Paths) {
         if (-not (Test-Path -LiteralPath $path -PathType Container)) { continue }
+
         try {
+            $root = Get-Item -LiteralPath $path -Force -ErrorAction Stop
+            if (($root.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                $scanFailures++
+                continue
+            }
+
             if ($Target.Mode -eq 'Pattern') {
-                $items = Get-ChildItem -LiteralPath $path -File -Force -Filter $Target.Filter -ErrorAction SilentlyContinue
+                $items = @(Get-ChildItem -LiteralPath $root.FullName -File -Force -Filter $Target.Filter -ErrorAction Stop)
+                foreach ($item in $items) {
+                    $files.Add([pscustomobject]@{ FullName = $item.FullName; Length = [long]$item.Length; Target = $Target.Name })
+                }
             } else {
-                $items = Get-ChildItem -LiteralPath $path -File -Force -Recurse -ErrorAction SilentlyContinue
+                $directories = New-Object 'System.Collections.Generic.Stack[System.IO.DirectoryInfo]'
+                $directories.Push($root)
+                while ($directories.Count -gt 0) {
+                    $directory = $directories.Pop()
+                    try {
+                        $items = @(Get-ChildItem -LiteralPath $directory.FullName -Force -ErrorAction Stop)
+                    } catch {
+                        $scanFailures++
+                        continue
+                    }
+
+                    foreach ($item in $items) {
+                        if ($item.PSIsContainer) {
+                            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) {
+                                $directories.Push($item)
+                            }
+                            continue
+                        }
+
+                        $files.Add([pscustomobject]@{ FullName = $item.FullName; Length = [long]$item.Length; Target = $Target.Name })
+                    }
+                }
             }
-            foreach ($item in $items) {
-                $files.Add([pscustomobject]@{ FullName = $item.FullName; Length = [long]$item.Length; Target = $Target.Name })
-            }
-        } catch { }
+        } catch {
+            $scanFailures++
+        }
     }
-    return [pscustomobject]@{ Files = $files.ToArray(); Skipped = $null }
+
+    $skipped = if ($scanFailures -gt 0) { '{0} protected folder(s) skipped' -f $scanFailures } else { $null }
+    return [pscustomobject]@{ Files = $files.ToArray(); Skipped = $skipped }
+}
+
+function Get-CleanupDirectories {
+    param([string]$Path)
+
+    $directories = New-Object 'System.Collections.Generic.List[System.IO.DirectoryInfo]'
+    try {
+        $root = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+        if (($root.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { return @() }
+    } catch {
+        return @()
+    }
+
+    $pending = New-Object 'System.Collections.Generic.Stack[System.IO.DirectoryInfo]'
+    $pending.Push($root)
+    while ($pending.Count -gt 0) {
+        $directory = $pending.Pop()
+        try {
+            $children = @(Get-ChildItem -LiteralPath $directory.FullName -Directory -Force -ErrorAction Stop)
+        } catch {
+            continue
+        }
+
+        foreach ($child in $children) {
+            if (($child.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
+            $directories.Add($child)
+            $pending.Push($child)
+        }
+    }
+
+    return $directories.ToArray()
 }
 
 function Clear-EmptyCleanupDirectories {
@@ -584,13 +701,11 @@ function Clear-EmptyCleanupDirectories {
         foreach ($path in $target.Paths) {
             if (-not (Test-Path -LiteralPath $path -PathType Container)) { continue }
 
-            try {
-                Get-ChildItem -LiteralPath $path -Directory -Force -Recurse -ErrorAction SilentlyContinue |
-                    Sort-Object { $_.FullName.Length } -Descending |
-                    ForEach-Object {
-                        try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop } catch { }
-                    }
-            } catch { }
+            Get-CleanupDirectories -Path $path |
+                Sort-Object { $_.FullName.Length } -Descending |
+                ForEach-Object {
+                    try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop } catch { }
+                }
         }
     }
 }
@@ -629,8 +744,9 @@ function Show-CleanupReport {
         $totalBytes += $item.Bytes
         $totalFiles += $item.Count
         if ($item.Skipped) {
-            $lines.Add(('[ LOCKED ] {0} // {1}' -f $item.Name, $item.Skipped))
-        } else {
+            $lines.Add(('[ LIMITED ] {0} // {1}' -f $item.Name, $item.Skipped))
+        }
+        if ($item.Count -gt 0 -or -not $item.Skipped) {
             $lines.Add(('[ READY  ] {0} // {1} files // {2}' -f $item.Name, $item.Count, (Format-Bytes $item.Bytes)))
         }
     }
@@ -882,8 +998,10 @@ function Invoke-RegenWatch {
         $before = @($baseline.Targets | Where-Object { $_.Name -eq $item.Name } | Select-Object -First 1)[0]
         [long]$beforeBytes = if ($before) { $before.Bytes } else { 0 }
         [long]$growth = $item.Bytes - $beforeBytes
-        if ($item.Skipped) {
+        if ($item.Skipped -eq 'Close the related app first') {
             $lines.Add(('[ PAUSED ] {0} // close the related app to measure' -f $item.Name))
+        } elseif ($item.Skipped) {
+            $lines.Add(('[ LIMITED ] {0} // {1}' -f $item.Name, $item.Skipped))
         } elseif ($growth -gt 0) {
             $lines.Add(('[ GREW   ] {0} // +{1}' -f $item.Name, (Format-Bytes $growth)))
         } else {
@@ -911,11 +1029,12 @@ function Invoke-WindowsRepair {
     & sfc.exe /scannow
     $sfcExit = $LASTEXITCODE
     Show-PageTransition -Text 'BUILDING REPAIR REPORT'
+    $repairResult = if ($dismExit -eq 0 -and $sfcExit -eq 0) { 'Completed' } else { 'Completed with errors' }
     Show-ModulePanel -Title 'WINDOWS REPAIR RUN // COMPLETE' -Lines @(
         ('DISM exit code: {0}' -f $dismExit),
         ('SFC exit code: {0}' -f $sfcExit)
     )
-    Write-Activity -Action 'Windows Repair Run' -Result 'Completed' -Details @{ DismExit = $dismExit; SfcExit = $sfcExit }
+    Write-Activity -Action 'Windows Repair Run' -Result $repairResult -Details @{ DismExit = $dismExit; SfcExit = $sfcExit }
 }
 
 function Invoke-AppUpdateRun {
@@ -927,15 +1046,41 @@ function Invoke-AppUpdateRun {
         Write-Activity -Action 'App Update Run' -Result 'WinGet unavailable'
         return
     }
-    Show-ModulePanel -Title 'APP UPDATE RUN // PACKAGE PREVIEW' -Lines @(
-        'Checking installed packages for updates...'
+
+    $previewArguments = @(
+        'list',
+        '--upgrade-available',
+        '--include-unknown',
+        '--accept-source-agreements'
     )
-    & winget.exe upgrade --include-unknown --include-pinned --accept-source-agreements
+    $upgradeArguments = @(
+        'upgrade',
+        '--all',
+        '--include-unknown',
+        '--accept-source-agreements',
+        '--accept-package-agreements'
+    )
+
+    Show-ModulePanel -Title 'APP UPDATE RUN // PACKAGE PREVIEW' -Lines @(
+        'Checking packages with available upgrades...'
+    )
+    & winget.exe @previewArguments
     $previewExit = $LASTEXITCODE
+
+    if ($previewExit -ne 0) {
+        Show-PageTransition -Text 'UPDATE CHECK FAILED'
+        Show-ModulePanel -Title 'APP UPDATE RUN' -Lines @(
+            ('WinGet could not build the update list. Exit code: {0}.' -f $previewExit),
+            'Check WinGet sources and your internet connection, then try again.'
+        )
+        Write-Activity -Action 'App Update Run' -Result 'Preview failed' -Details @{ PreviewExit = $previewExit }
+        return
+    }
+
     Write-Host ''
     Write-RetroBorder
     Write-RetroFrameLine '' -Color DarkCyan
-    Write-RetroFrameLine '[ UPDATE ALL ]  Install every package shown above?' -Color Yellow
+    Write-RetroFrameLine '[ UPDATE ALL ]  Install every available WinGet update?' -Color Yellow
     Write-RetroFrameLine '' -Color DarkCyan
     Write-RetroFrameLine '[Y] Yes     [N] No' -Color Gray
     Write-RetroFrameLine '' -Color DarkCyan
@@ -950,17 +1095,28 @@ function Invoke-AppUpdateRun {
         Show-ModulePanel -Title 'APP UPDATE RUN' -Lines @(
             'Update run cancelled. The package preview was not changed.'
         )
+        Write-Activity -Action 'App Update Run' -Result 'Cancelled' -Details @{ PreviewExit = $previewExit }
         return
     }
     Show-PageTransition -Text 'STARTING APP UPDATES'
-    Show-ModulePanel -Title 'APP UPDATE RUN // INSTALLING AVAILABLE UPDATES'
-    & winget.exe upgrade --all --include-unknown --include-pinned --accept-source-agreements --accept-package-agreements --disable-interactivity --silent --force
+    Show-ModulePanel -Title 'APP UPDATE RUN // INSTALLING AVAILABLE UPDATES' -Lines @(
+        'Running the standard WinGet upgrade sequence.',
+        'Installer windows may appear when a package requires them.'
+    )
+    & winget.exe @upgradeArguments
     $updateExit = $LASTEXITCODE
     Show-PageTransition -Text 'BUILDING UPDATE REPORT'
+
+    $resultLine = if ($updateExit -eq 0) {
+        'WinGet completed the update run.'
+    } else {
+        ('WinGet ended with exit code {0}. Review the package output above.' -f $updateExit)
+    }
     Show-ModulePanel -Title 'APP UPDATE RUN // COMPLETE' -Lines @(
-        ('Update command finished with exit code {0}.' -f $updateExit)
+        $resultLine
     )
-    Write-Activity -Action 'App Update Run' -Result 'Completed' -Details @{ PreviewExit = $previewExit; UpdateExit = $updateExit }
+    $activityResult = if ($updateExit -eq 0) { 'Completed' } else { 'Completed with package errors' }
+    Write-Activity -Action 'App Update Run' -Result $activityResult -Details @{ PreviewExit = $previewExit; UpdateExit = $updateExit }
 }
 
 function Show-ActivityLog {

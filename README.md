@@ -2,7 +2,7 @@
 
 SYS CTRL is a Windows terminal control deck for routine system maintenance. It combines safe temporary-file cleanup, storage inspection, repair tools, application updates, and power controls in a single retro-styled console interface.
 
-Version: 2.0.1
+Version: 2.0.2
 
 ## Requirements
 
@@ -25,11 +25,11 @@ The batch file starts the PowerShell interface with UTF-8 support, allowing the 
 
 | Module | Purpose |
 | --- | --- |
-| Cache Sweep | Removes safe temporary files and application caches while leaving locked files and active browser caches alone. |
+| Cache Sweep | Removes safe temporary files, Windows Update download data, Delivery Optimization data, and application caches while leaving locked files and active browser caches alone. |
 | Space Hunter | Lists larger user-profile locations to help identify where storage is being used. |
 | Regen Watch | Records cleanup results and identifies cache growth since the previous sweep. |
 | Windows Repair | Runs DISM RestoreHealth followed by SFC /scannow. |
-| App Update Run | Shows WinGet upgrades and asks for `Y` or `N` before installing available updates. |
+| App Update Run | Lists available WinGet upgrades and asks for `Y` or `N` before running the standard WinGet update command. |
 | After Action Report | Displays recent SYS CTRL activity. |
 | Power Control | Opens Slide to Shut Down or requests a restart to BIOS / UEFI. |
 
